@@ -21,7 +21,7 @@ public class UsersController : ControllerBase
     // GET /api/users/me
     [HttpGet("me")]
     [Authorize] // requires valid Bearer token
-    public async Task<IActionResult> GetUser()
+    public async Task<ActionResult<User>> GetUser()
     {
         var ctx = HttpContext.User;
         _logger.LogInformation("Getting user information from token...");
