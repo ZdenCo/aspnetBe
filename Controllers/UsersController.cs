@@ -9,13 +9,11 @@ namespace ProperAuthApi.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly UserService _userService;
-    private readonly ILogger<UsersController> _logger;
     private readonly AuthService _authService;
 
-    public UsersController(UserService userService, ILogger<UsersController> logger, AuthService authService)
+    public UsersController(UserService userService, AuthService authService)
     {
         _userService = userService;
-        _logger = logger;
         _authService = authService;
     }
     // GET /api/users/me
@@ -24,22 +22,13 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<User>> GetUser()
     {
         var ctx = HttpContext.User;
-        _logger.LogInformation("Getting user information from token...");
 
         var tokenData = _authService.GetTokenDataFromContext(ctx);
-        _logger.LogInformation($"User: {tokenData}");
 
         var subject = tokenData.subject;
         var email = tokenData.email;
-        _logger.LogInformation($"Subject: {subject}");
-
-        if (subject == null || email == null)
-        {
-           throw new UnauthorizedAccessException("Missing sub or email claim");
-        }
 
         var dbUser = await _userService.GetUserByEmailAndSubjectAsync(email,subject);
-        _logger.LogInformation($"Database User: {dbUser}");
 
         if (dbUser == null)
         {

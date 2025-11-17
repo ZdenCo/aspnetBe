@@ -10,7 +10,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-
 var authority = builder.Configuration["Jwt:Authority"];
 var audience = builder.Configuration["Jwt:Audience"];
 var secret = builder.Configuration["Jwt:Secret"];
@@ -33,11 +32,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         ValidateIssuerSigningKey = true,
         ValidateIssuer = true,
-        ValidIssuers = new[]
-        {
-            authority.TrimEnd('/'),
-            authority.TrimEnd('/') + "/"
-        },
+        ValidIssuers = new[] { authority },
 
         ValidateAudience = true,
         ValidAudience = audience, 
@@ -46,7 +41,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ClockSkew = TimeSpan.FromMinutes(2),
     };
 
-    options.IncludeErrorDetails = true;
+    // only for dev
+    if (builder.Environment.IsDevelopment())
+    {
+        options.IncludeErrorDetails = true;
+    }
 
     options.Events = new JwtBearerEvents
     {
@@ -68,7 +67,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             }
             logger.LogInformation("Ensuring user exists in database...");
             var UserService = context.HttpContext.RequestServices.GetRequiredService<UserService>();
-            
+
             await UserService.EnsureUserExistsAsync(tokenData.email, tokenData.subject);
             logger.LogInformation("User existence ensured.");
         }
@@ -85,6 +84,8 @@ builder.Services.AddCors(opt =>
          .AllowAnyMethod());
 });
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 app.UseSwagger();
@@ -99,5 +100,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHub<ChatHub>("/api/chat");
 
 app.Run();

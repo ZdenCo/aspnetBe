@@ -45,7 +45,6 @@ public class UserService
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
-
         _dbContext.Users.Add(user);
         await _dbContext.SaveChangesAsync();
 

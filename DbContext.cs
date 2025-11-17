@@ -13,6 +13,6 @@ public class AppDbContext : DbContext
     {
         b.Entity<User>()
             .HasIndex(u => new { u.Email, u.Subject })
-            .IsUnique(); // critical for concurrency
+            .IsUnique();
     }
 }
