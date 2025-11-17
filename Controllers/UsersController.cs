@@ -30,17 +30,15 @@ public class UsersController : ControllerBase
         _logger.LogInformation($"User: {tokenData}");
 
         var subject = tokenData.subject;
+        var email = tokenData.email;
         _logger.LogInformation($"Subject: {subject}");
 
-        var issuer = tokenData.issuer;
-        _logger.LogInformation($"Issuer: {issuer}");
-
-        if (subject == null || issuer == null)
+        if (subject == null || email == null)
         {
-           throw new UnauthorizedAccessException("Missing sub or iss claim");
+           throw new UnauthorizedAccessException("Missing sub or email claim");
         }
 
-        var dbUser = await _userService.GetUserByIssuerAndSubjectAsync(issuer,subject);
+        var dbUser = await _userService.GetUserByEmailAndSubjectAsync(email,subject);
         _logger.LogInformation($"Database User: {dbUser}");
 
         if (dbUser == null)

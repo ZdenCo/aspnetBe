@@ -62,13 +62,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
 
-            if (tokenData.issuer == null || tokenData.subject == null)
+            if (tokenData.email == null || tokenData.subject == null)
             {
-                throw new Exception("Issuer or Subject claim is missing");
+                throw new Exception("Email or Subject claim is missing");
             }
             logger.LogInformation("Ensuring user exists in database...");
             var UserService = context.HttpContext.RequestServices.GetRequiredService<UserService>();
-            await UserService.EnsureUserExistsAsync(tokenData.issuer, tokenData.subject);
+            
+            await UserService.EnsureUserExistsAsync(tokenData.email, tokenData.subject);
             logger.LogInformation("User existence ensured.");
         }
     };

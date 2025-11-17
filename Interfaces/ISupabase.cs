@@ -8,6 +8,6 @@ public sealed class IUserMetadata
 
 public sealed class ITokenData
 {
-    public string issuer { get; set; }
+    public string email { get; set; }
     public string subject { get; set; }
 }
