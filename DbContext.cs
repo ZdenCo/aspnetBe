@@ -8,4 +8,11 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+
+    protected override void OnModelCreating(ModelBuilder b)
+    {
+        b.Entity<User>()
+            .HasIndex(u => new { u.Issuer, u.Subject })
+            .IsUnique(); // critical for concurrency
+    }
 }

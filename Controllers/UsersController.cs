@@ -8,26 +8,46 @@ namespace ProperAuthApi.Controllers;
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {
-    // GET /api/users/getUser
-    [HttpGet("getUser")]
-    [Authorize] // requires valid Bearer token
-    public IActionResult GetUser()
+    private readonly UserService _userService;
+    private readonly ILogger<UsersController> _logger;
+    private readonly AuthService _authService;
+
+    public UsersController(UserService userService, ILogger<UsersController> logger, AuthService authService)
     {
-        var user = HttpContext.User;
+        _userService = userService;
+        _logger = logger;
+        _authService = authService;
+    }
+    // GET /api/users/me
+    [HttpGet("me")]
+    [Authorize] // requires valid Bearer token
+    public async Task<IActionResult> GetUser()
+    {
+        var ctx = HttpContext.User;
+        _logger.LogInformation("Getting user information from token...");
 
-        // Typical JWT claims: sub (user id), email
-        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                     ?? user.FindFirst("sub")?.Value;
+        var tokenData = _authService.GetTokenDataFromContext(ctx);
+        _logger.LogInformation($"User: {tokenData}");
 
-        var email = user.FindFirst(ClaimTypes.Email)?.Value
-                    ?? user.FindFirst("email")?.Value;
+        var subject = tokenData.subject;
+        _logger.LogInformation($"Subject: {subject}");
 
-        return Ok(new
+        var issuer = tokenData.issuer;
+        _logger.LogInformation($"Issuer: {issuer}");
+
+        if (subject == null || issuer == null)
         {
-            authenticated = user.Identity?.IsAuthenticated ?? false,
-            userId,
-            email,
-            claims = user.Claims.Select(c => new { c.Type, c.Value })
-        });
+           throw new UnauthorizedAccessException("Missing sub or iss claim");
+        }
+
+        var dbUser = await _userService.GetUserByIssuerAndSubjectAsync(issuer,subject);
+        _logger.LogInformation($"Database User: {dbUser}");
+
+        if (dbUser == null)
+        {
+            throw new UnauthorizedAccessException("User not found in database");
+        }        
+
+        return Ok(dbUser);
     }
 }

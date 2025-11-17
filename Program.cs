@@ -4,10 +4,9 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
 
 builder.Services.AddControllers();
 
@@ -17,23 +16,22 @@ var audience = builder.Configuration["Jwt:Audience"];
 var secret = builder.Configuration["Jwt:Secret"];
 var connectionString = builder.Configuration.GetConnectionString("Default");
 
-Console.WriteLine($"Authority = {authority}");
-Console.WriteLine($"Audience  = {audience}");
-Console.WriteLine($"Connection String = {connectionString}");
-
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<AuthService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 .AddJwtBearer(options =>
 {
     options.Authority = authority;
-    // Helpful in dev if there’s a tiny clock drift
+
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
-        // Issuer
+
+        ValidateIssuerSigningKey = true,
         ValidateIssuer = true,
         ValidIssuers = new[]
         {
@@ -41,16 +39,39 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             authority.TrimEnd('/') + "/"
         },
 
-        // Audience
         ValidateAudience = true,
-        ValidAudience = audience, // "authenticated"
+        ValidAudience = audience, 
 
-        // Lifetime & signature
         ValidateLifetime = true,
         ClockSkew = TimeSpan.FromMinutes(2),
     };
 
     options.IncludeErrorDetails = true;
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            if (context.Principal == null)
+            {
+                throw new Exception("Principal is null");
+            }
+
+            var AuthService = context.HttpContext.RequestServices.GetRequiredService<AuthService>();
+            var tokenData = AuthService.GetTokenDataFromContext(context.Principal); 
+
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+            if (tokenData.issuer == null || tokenData.subject == null)
+            {
+                throw new Exception("Issuer or Subject claim is missing");
+            }
+            logger.LogInformation("Ensuring user exists in database...");
+            var UserService = context.HttpContext.RequestServices.GetRequiredService<UserService>();
+            await UserService.EnsureUserExistsAsync(tokenData.issuer, tokenData.subject);
+            logger.LogInformation("User existence ensured.");
+        }
+    };
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -65,12 +86,8 @@ builder.Services.AddCors(opt =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
