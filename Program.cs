@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,8 +20,8 @@ var connectionString = builder.Configuration.GetConnectionString("Default");
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connectionString));
 
-builder.Services.AddScoped<UserService>();
-builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 .AddJwtBearer(options =>
@@ -41,7 +43,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ClockSkew = TimeSpan.FromMinutes(2),
     };
 
-    // only for dev
     if (builder.Environment.IsDevelopment())
     {
         options.IncludeErrorDetails = true;
@@ -49,30 +50,41 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
     options.Events = new JwtBearerEvents
     {
+        OnMessageReceived = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("OnMessageReceived invoked");
+            var accessToken = context.Request.Query["access_token"];
+            logger.LogInformation("Access Token: {AccessToken}", accessToken);
+            var path = context.HttpContext.Request.Path;
+            logger.LogInformation("Request Path: {Path}", path);
+
+            // MUST match your hub path exactly: /api/chat
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/api/chat"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        },
         OnTokenValidated = async context =>
         {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
             if (context.Principal == null)
             {
+                logger.LogError("Principal is null");
                 throw new Exception("Principal is null");
             }
 
             var AuthService = context.HttpContext.RequestServices.GetRequiredService<AuthService>();
-            var tokenData = AuthService.GetTokenDataFromContext(context.Principal); 
+            var dbUser = await AuthService.GetAuthUser(context.Principal); 
 
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-
-            if (tokenData.email == null || tokenData.subject == null)
-            {
-                throw new Exception("Email or Subject claim is missing");
-            }
-            logger.LogInformation("Ensuring user exists in database...");
-            var UserService = context.HttpContext.RequestServices.GetRequiredService<UserService>();
-
-            await UserService.EnsureUserExistsAsync(tokenData.email, tokenData.subject);
-            logger.LogInformation("User existence ensured.");
+            context.HttpContext.Items["CurrentUser"] = dbUser;
         }
     };
 });
+
+
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -84,7 +96,17 @@ builder.Services.AddCors(opt =>
          .AllowAnyMethod());
 });
 
-builder.Services.AddSignalR();
+builder.Services.AddSingleton<IUserIdProvider, EmailUserIdProvider>();
+
+builder.Services.AddSignalR(options =>
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        options.EnableDetailedErrors = true;
+    }
+});
+
+
 
 var app = builder.Build();
 

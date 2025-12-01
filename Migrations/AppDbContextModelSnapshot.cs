@@ -16,7 +16,7 @@ namespace aspnetBe.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.11")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -36,11 +36,10 @@ namespace aspnetBe.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Name")
-                        .HasColumnType("text");
+                    b.Property<Guid>("GuidId")
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("Subject")
-                        .IsRequired()
+                    b.Property<string>("Name")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -48,7 +47,7 @@ namespace aspnetBe.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email", "Subject")
+                    b.HasIndex("Email")
                         .IsUnique();
 
                     b.ToTable("Users");

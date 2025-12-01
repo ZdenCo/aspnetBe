@@ -8,10 +8,10 @@ namespace ProperAuthApi.Controllers;
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {
-    private readonly UserService _userService;
-    private readonly AuthService _authService;
+    private readonly IUserService _userService;
+    private readonly IAuthService _authService;
 
-    public UsersController(UserService userService, AuthService authService)
+    public UsersController(IUserService userService, IAuthService authService)
     {
         _userService = userService;
         _authService = authService;
@@ -21,14 +21,7 @@ public class UsersController : ControllerBase
     [Authorize] // requires valid Bearer token
     public async Task<ActionResult<User>> GetUser()
     {
-        var ctx = HttpContext.User;
-
-        var tokenData = _authService.GetTokenDataFromContext(ctx);
-
-        var subject = tokenData.subject;
-        var email = tokenData.email;
-
-        var dbUser = await _userService.GetUserByEmailAndSubjectAsync(email,subject);
+        var dbUser = HttpContext.Items["User"] as User;
 
         if (dbUser == null)
         {
